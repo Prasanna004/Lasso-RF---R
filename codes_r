@@ -1,0 +1,109 @@
+exp <- read.csv("meta.csv",row.names = 1)
+exp <- t(exp)
+clin <- read.csv("expression.csv",row.names = 1)
+
+#1.Lasso
+X = exp
+Y = clin$group
+d=data.frame(X,Y)
+d
+
+table(Y)
+library(glmnet)
+set.seed(12345)
+cv_fit <- cv.glmnet(x=X, y=Y)
+cv_fit
+plot(cv_fit)
+fit <- glmnet(x=X, y=Y)
+fit
+plot(fit,xvar = "lambda")
+model_lasso_min <- glmnet(x=X, y=Y,lambda=cv_fit$lambda.min)
+model_lasso_1se <- glmnet(x=X, y=Y,lambda=cv_fit$lambda.1se)
+library(plotmo)
+plot_glmnet(fit)
+coef = coef(fit, s = cv_fit$lambda.min) 
+coef
+actCoef = coef[coef[,1] != 0,] 
+actCoef
+lassoGene = row.names(coef)[coef[,1] != 0] 
+lassoGene
+d=data.frame(X,Y)
+d
+finalLasso <- glm(d$., ~ feature1, feature2, feature3,
+                  data=d,
+                  family=binomial(link="logit"))
+summary(finalLasso)
+
+
+dat8 <- cbind(clin,exp)
+dat8 <- dat8[,-1]
+dat8
+ntree <- 500
+library(randomForest)
+Y <- as.factor(dat8$group)
+class(dat8)
+train.rf <- randomForest(x = dat8[,-1], y = dat8$group,ntree=1000)
+print(train.rf)
+train.rf
+plot(train.rf)
+varImpPlot(train.rf)
+varImpPlot(train.rf, sort=TRUE, n.var=min(40, nrow(train.rf$importance)),
+           type=NULL, class=NULL, scale=TRUE, 
+           main=deparse(substitute(train.rf))) 
+rf_gene=train.rf$importance
+rf_gene
+imp <- importance(train.rf)
+imp <- as.data.frame(imp)
+imp
+imp$ID <-  rownames(imp)
+imp <- imp[order(imp$IncNodePurity),]
+imp
+imp1 <- imp[(189:199),]
+imp1
+lass1 <- lassoGene
+genes = list(Lasso = lass1,
+             Rf = rownames(imp1))
+Lasso = lass1
+Rf = rownames(imp1)
+Rf
+genes
+barplot(Lasso,Rf)
+library(VennDiagram)
+venn.diagram(genes,"genes",color = c("#f39b7fff", "#00a087ff"))
+g=intersect(lass1,rownames(imp1))
+exp <- t(exp)
+exp1 = exp[rownames(exp) %in% g,]
+exp1 <- t(exp1)
+exp1 <- as.data.frame(exp1)
+exp1$group <-clin$group
+# nomogram
+library(rms)
+model <- lrm(exp,exp1,x = T, y =T,maxit=1000)
+print(model)
+dd <- datadist(exp1)
+options(datadist="dd")
+nomo <- nomogram(model)
+plot(nomo)
+
+cal1<-calibrate(model,method="boot",B=1000)
+par(mar=c(6,5,1,2),cex = 1.0)#ͼ?β???
+plot(cal1,xlim=c(0,1.0),ylim=c(0,1.0),
+     xlab = "Predicted Pr (PCOS=1)", ylab = "Actual Probablity")
+
+
+write.csv(imp, "imp.csv")
+lassoGene
+train.rf
+
+library(rms)
+n <- 1000    # define sample size
+set.seed(17) # so can reproduce the results
+d <- data.frame(exp1$group)
+d
+dd <- datadist(d)
+dd
+y=exp1$group
+y
+f=lrm(y~.,data=d)
+f
+nomo=plot(nomogram(f))
